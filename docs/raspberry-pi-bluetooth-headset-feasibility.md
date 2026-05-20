@@ -443,11 +443,13 @@ flowchart LR
     A["FastAPI /call"] --> B["ADB 控制安卓手机拨号"]
     B --> C["等待 mForegroundCallState=1"]
     C --> D["检查 Active communication device=bt_sco"]
-    D --> E["SSH 调树莓派 ffmpeg 播放 MP3 到 bluealsa SCO"]
+    D --> E["树莓派本机 ffmpeg 播放 MP3 到 bluealsa SCO"]
     E --> F["播放完成后 ADB 挂断"]
 ```
 
 树莓派只负责音频播放和可选录音；拨号、状态判断、挂断仍由 Python/ADB 完成。
+
+当前 MVP 建议固定为 `手机A -> 树莓派A`，先保证单链路稳定。不要在第一版里引入多手机共享一台树莓派、音频节点池或蓝牙适配器调度。
 
 ## 16. 当前阶段建议
 

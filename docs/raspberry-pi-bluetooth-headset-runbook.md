@@ -413,20 +413,18 @@ systemctl list-timers autocallbot-bt-maintenance.timer
 
 ## 11. 代码实现建议
 
-后续代码不建议直接散落 SSH 命令，建议抽象一个树莓派音频节点。
+服务直接部署在树莓派本机。当前 MVP 明确采用 `手机A -> 树莓派A` 的固定绑定，不做多手机池化、不做音频节点调度；如果这台手机正在外呼，新的任务直接返回 busy。
 
 建议接口：
 
 | 能力 | 命令/动作 |
 | --- | --- |
-| 健康检查 | `ssh pi 'sudo -n true; systemctl is-active bluetooth bluealsa bt-agent; bluealsa-aplay -L'` |
-| 重置蓝牙音频节点 | `ssh pi 'sudo /usr/local/bin/autocallbot-bt-restart.sh'` |
-| 上传音频 | `scp <local_mp3> liuzhuo@10.0.0.16:/tmp/autocallbot/<call_id>.mp3` |
+| 健康检查 | `systemctl is-active bluetooth bluealsa bt-agent; bluealsa-aplay -L` |
+| 重置蓝牙音频节点 | `sudo /usr/local/bin/autocallbot-bt-restart.sh` |
+| 准备音频 | 把 MP3 放到树莓派本机路径，例如 `/tmp/autocallbot/<call_id>.mp3` |
 | 检查 SCO | 解析 `bluealsa-aplay -L` 是否包含 `DEV=<PHONE_MAC>,PROFILE=sco` 和 `playback` |
-| 开始播放 | `systemd-run --unit=autocallbot-play-<call_id> ... ffmpeg ...` |
-| 停止播放 | `sudo systemctl stop autocallbot-play-<call_id>.service` |
-| 查询播放状态 | `systemctl show autocallbot-play-<call_id>.service -p ActiveState -p SubState -p MainPID` |
-| 查看日志 | `journalctl -u autocallbot-play-<call_id>.service -n 80 --no-pager` |
+| 开始播放 | 服务进程直接调用 `ffmpeg ... bluealsa:...PROFILE=sco...` |
+| 查看日志 | `tail -f data/logs/autocallbot.log` 或 `journalctl -u autocallbot -f` |
 
 推荐调用顺序：
 
@@ -439,17 +437,16 @@ flowchart LR
     E --> F{"SCO 是否正常"}
     F -->|"否"| G["重置蓝牙音频节点"]
     G --> E
-    F -->|"是"| H["上传或复用 MP3"]
-    H --> I["systemd-run 启动 ffmpeg 播放"]
-    I --> J["播放完成或任务取消"]
-    J --> K["停止播放并挂断电话"]
+    F -->|"是"| H["读取本机 MP3"]
+    H --> I["ffmpeg 播放到 BlueALSA SCO"]
+    I --> J["播放完成、对方挂断或超时"]
+    J --> K["清理播放并挂断电话"]
 ```
 
-代码实现时建议把 `PHONE_MAC`、`PI_HOST`、`SCO_RATE`、音量倍数、最长播放时间做成配置项：
+代码实现时把 `ADB_SERIAL`、`PHONE_MAC`、`SCO_RATE`、音量倍数、最长播放时间直接放在 `autocallbot/config.py` 顶部变量里：
 
 ```text
-PI_HOST=10.0.0.16
-PI_USER=liuzhuo
+ADB_SERIAL=10.0.0.104:5555
 PHONE_MAC=B8:D4:3E:6A:AF:84
 BLUEALSA_PCM=bluealsa:SRV=org.bluealsa,DEV=B8:D4:3E:6A:AF:84,PROFILE=sco,VOL=100+,SOFTVOL=yes
 SCO_RATE=16000

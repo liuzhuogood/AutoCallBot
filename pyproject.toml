@@ -5,6 +5,7 @@ description = "Android ADB based outbound call bot MVP"
 requires-python = ">=3.10"
 dependencies = [
     "fastapi>=0.111.0",
+    "loguru>=0.7.2",
     "uvicorn[standard]>=0.30.0",
 ]
 

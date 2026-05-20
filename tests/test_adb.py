@@ -1,4 +1,4 @@
-from autocallbot.adb import CallState, guess_audio_mime_type, parse_call_snapshot, parse_call_state
+from autocallbot.adb import CallState, parse_bt_sco_active, parse_call_snapshot, parse_call_state
 
 
 def test_parse_call_state_prefers_offhook() -> None:
@@ -17,12 +17,6 @@ def test_parse_call_state_defaults_idle() -> None:
     assert parse_call_state("no call state here") == CallState.IDLE
 
 
-def test_guess_audio_mime_type_prefers_mp3_default() -> None:
-    assert guess_audio_mime_type("/sdcard/voice.mp3") == "audio/mpeg"
-    assert guess_audio_mime_type("file:///sdcard/voice.wav") == "audio/wav"
-    assert guess_audio_mime_type("/sdcard/voice") == "audio/mpeg"
-
-
 def test_parse_call_snapshot_waits_for_precise_active_state() -> None:
     dialing = """
       mCallState=2
@@ -35,3 +29,9 @@ def test_parse_call_snapshot_waits_for_precise_active_state() -> None:
 
     assert parse_call_snapshot(dialing).is_active is False
     assert parse_call_snapshot(active).is_active is True
+
+
+def test_parse_bt_sco_active_reads_active_communication_device() -> None:
+    output = "Active communication device: AudioDeviceInfo: type:bt_sco name:AutoCallBot-BT"
+    assert parse_bt_sco_active(output) is True
+    assert parse_bt_sco_active("Active communication device: type:built_in_earpiece") is False
