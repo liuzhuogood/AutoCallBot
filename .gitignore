@@ -5,4 +5,5 @@ __pycache__/
 .ruff_cache/
 .mypy_cache/
 config/devices.json
+data/
 test-call.*
