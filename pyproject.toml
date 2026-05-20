@@ -1,0 +1,18 @@
+[project]
+name = "auto-call-bot"
+version = "0.1.0"
+description = "Android ADB based outbound call bot MVP"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.111.0",
+    "uvicorn[standard]>=0.30.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.2.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
