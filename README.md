@@ -47,6 +47,24 @@ uvicorn autocallbot.main:app --host 0.0.0.0 --port 8000
 
 部署脚本会安装 ADB、BlueALSA、ffmpeg、Python venv，并创建 `autocallbot.service`。
 
+日常小改快速部署并重启：
+
+```bash
+./scripts/fast_deploy_pi.sh
+```
+
+快速部署脚本只同步当前项目文件并重启 `autocallbot.service`，不会重新安装系统依赖或重建 venv。默认树莓派地址是 `liuzhuo@10.0.0.113`，需要覆盖时可以这样跑：
+
+```bash
+PI_HOST=raspberry-pi ./scripts/fast_deploy_pi.sh
+```
+
+如果改了依赖或打包配置，需要顺手执行一次 editable install：
+
+```bash
+INSTALL_EDITABLE=1 ./scripts/fast_deploy_pi.sh
+```
+
 ## 调用
 
 ```bash

@@ -5,7 +5,7 @@ from pathlib import Path
 
 # Raspberry Pi + one Android phone.
 DEVICE_ID = "phone-a"
-ADB_SERIAL = "10.0.0.104:5555"
+ADB_SERIAL = "10.0.0.117:5555"
 DEFAULT_SIM = 0
 
 # Call flow.

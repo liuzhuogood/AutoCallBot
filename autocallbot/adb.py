@@ -27,10 +27,27 @@ class AdbClient:
     def __init__(self, serial: str, adb_path: str = "adb") -> None:
         self.serial = serial
         self.adb_path = adb_path
+        self._connected = False
 
     async def shell(self, args: list[str], timeout: float = 15.0) -> str:
+        await self.ensure_connected()
         command = [self.adb_path, "-s", self.serial, *args]
-        return await asyncio.to_thread(run_adb, command, timeout)
+        try:
+            return await asyncio.to_thread(run_adb, command, timeout)
+        except AdbError as exc:
+            if not is_tcp_serial(self.serial) or not is_missing_device_error(str(exc)):
+                raise
+            self._connected = False
+            await self.ensure_connected()
+            return await asyncio.to_thread(run_adb, command, timeout)
+
+    async def ensure_connected(self) -> None:
+        if self._connected or not is_tcp_serial(self.serial):
+            return
+        output = await asyncio.to_thread(run_adb, [self.adb_path, "connect", self.serial], 10)
+        if not is_connect_success(output):
+            raise AdbError(output.strip() or f"adb connect {self.serial} failed")
+        self._connected = True
 
     async def dial(self, phone: str, sim: int) -> None:
         await self.shell(
@@ -74,6 +91,22 @@ def run_adb(command: list[str], timeout: float) -> str:
     if completed.returncode != 0:
         raise AdbError(completed.stderr.strip() or completed.stdout.strip() or "adb command failed")
     return completed.stdout
+
+
+def is_tcp_serial(serial: str) -> bool:
+    return re.fullmatch(r"[^:\s]+:\d+", serial) is not None
+
+
+def is_connect_success(output: str) -> bool:
+    return any(
+        line.strip().lower().startswith(("connected to ", "already connected to "))
+        for line in output.splitlines()
+    )
+
+
+def is_missing_device_error(message: str) -> bool:
+    normalized = message.lower()
+    return "not found" in normalized or "offline" in normalized or "no devices" in normalized
 
 
 def parse_call_state(output: str) -> CallState:
