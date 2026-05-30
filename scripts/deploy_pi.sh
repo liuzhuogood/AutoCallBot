@@ -34,7 +34,7 @@ Wants=network-online.target
 Type=simple
 User=${SERVICE_USER}
 WorkingDirectory=${APP_DIR}
-ExecStart=${APP_DIR}/.venv/bin/uvicorn autocallbot.main:app --host 0.0.0.0 --port 8000
+ExecStart=${APP_DIR}/.venv/bin/uvicorn autocallbot.main:app --host 0.0.0.0 --port 10086
 Restart=always
 RestartSec=3
 

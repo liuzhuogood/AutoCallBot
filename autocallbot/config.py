@@ -12,14 +12,15 @@ ADB_SERIAL = "10.0.0.117:5555"
 DEFAULT_SIM = 0
 
 # 外呼流程控制参数。
-# 轮询手机通话状态的间隔，越小越灵敏，但 ADB 调用越频繁。
-POLL_INTERVAL_SECONDS = 1.0
+# 轮询手机通话状态的间隔，越小越灵敏，但 ADB 调用越频繁；3.5mm 模式下可适当调低减少接通后空白。
+POLL_INTERVAL_SECONDS = 0.3
 # 拨号后很快回到空闲状态时，低于该秒数认为更像空号、拦截或异常结束。
 INVALID_HANGUP_SECONDS = 8.0
 # 拨号后等待接听的最长时间，超过后返回无人接听。
 NO_ANSWER_TIMEOUT_SECONDS = 20.0
-# 识别为已接通后的固定等待时间，用于给通话路由一点稳定时间。
-POST_CONNECT_GRACE_SECONDS = 1.0
+# 识别为已接通后的固定等待时间。
+# 3.5mm 模式不依赖蓝牙路由，可设为 0；切回蓝牙模式时建议保留 1 秒左右，给 bt_sco 通话路由稳定时间。
+POST_CONNECT_GRACE_SECONDS = 0.0
 # 单次通话允许播放的最长秒数；请求里的 play_seconds 不会超过该上限。
 MAX_PLAY_SECONDS = 300.0
 # 拨号前设置安卓手机媒体音量；设为 None 表示不主动调整。

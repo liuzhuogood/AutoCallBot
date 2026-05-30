@@ -45,7 +45,7 @@ MAX_PLAY_SECONDS = 300.0
 python -m venv .venv
 source .venv/bin/activate
 pip install -e .
-uvicorn autocallbot.main:app --host 0.0.0.0 --port 8000
+uvicorn autocallbot.main:app --host 0.0.0.0 --port 10086
 ```
 
 树莓派部署：
@@ -77,7 +77,7 @@ INSTALL_EDITABLE=1 ./scripts/fast_deploy_pi.sh
 ## 调用
 
 ```bash
-curl -X POST http://127.0.0.1:8000/call \
+curl -X POST http://127.0.0.1:10086/call \
   -H 'Content-Type: application/json' \
   -d '{"phone":"13800138000","audio_path":"/tmp/1779194620494.mp3","play_seconds":12}'
 ```
