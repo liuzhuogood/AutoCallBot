@@ -2,16 +2,18 @@
 
 AutoCallBot 是一个部署在树莓派上的单通道安卓自动外呼服务。
 
-当前模型固定为：
+当前模型：
 
 ```mermaid
 flowchart LR
     A["POST /call"] --> B["ADB 拨号"]
     B --> C["等待电话接通"]
-    C --> D["确认 Android 通话路由是 bt_sco"]
-    D --> E["检查本机 BlueALSA SCO playback"]
-    E --> F["本机 ffmpeg 播放 MP3 到 HFP/SCO"]
-    F --> G["对方挂断或超时后 ADB 挂断"]
+    C --> D{"AUDIO_OUTPUT_BACKEND"}
+    D -->|bluetooth| E["确认 Android 通话路由是 bt_sco"]
+    E --> F["本机 ffmpeg 播放到 BlueALSA SCO"]
+    D -->|alsa| G["本机 ffmpeg 播放到 3.5mm ALSA 输出"]
+    F --> H["对方挂断或超时后 ADB 挂断"]
+    G --> H
 ```
 
 只做 `手机A -> 树莓派A`，不做多手机池、不做任务状态库、不做外部 JSON 配置。
@@ -21,12 +23,19 @@ flowchart LR
 直接改 [autocallbot/config.py](/Users/liuzhuo/code/AutoCallBot/autocallbot/config.py) 顶部变量：
 
 ```python
-ADB_SERIAL = "10.0.0.104:5555"
+AUDIO_OUTPUT_BACKEND = "bluetooth"  # "bluetooth" 或 "alsa"
+ADB_SERIAL = "10.0.0.117:5555"
 PHONE_MAC = "B8:D4:3E:6A:AF:84"
+AUDIO_ALSA_PCM = "plughw:CARD=Headphones,DEV=0"
 MAX_PLAY_SECONDS = 300.0
 ```
 
-`audio_path` 是树莓派本机可访问的 MP3 路径，不是手机里的文件路径。
+`audio_path` 是树莓派本机可访问的音频路径，不是手机里的文件路径。MP3/WAV 都由 ffmpeg 播放。
+
+音频输出后端：
+
+- `AUDIO_OUTPUT_BACKEND = "bluetooth"`：走 BlueALSA SCO/HFP，要求手机通话音频路由切到蓝牙。
+- `AUDIO_OUTPUT_BACKEND = "alsa"`：走本机 ALSA 输出，例如树莓派 3.5mm 耳机口，不再等待 Android `bt_sco` 路由。
 
 ## 启动
 
@@ -86,13 +95,14 @@ data/logs/autocallbot.log
 ```bash
 adb devices
 bluealsa-aplay -L
+aplay -L
 ```
 
 关键条件：
 
-- 手机蓝牙详情里启用“通话音频”。
-- 通话中 Android 音频路由必须是 `bt_sco`。
-- `bluealsa-aplay -L` 必须能看到配置的 `PHONE_MAC`、`PROFILE=sco` 和 `playback`。
+- 蓝牙模式下，手机蓝牙详情里启用“通话音频”，通话中 Android 音频路由必须是 `bt_sco`。
+- 蓝牙模式下，`bluealsa-aplay -L` 必须能看到配置的 `PHONE_MAC`、`PROFILE=sco` 和 `playback`。
+- 3.5mm 模式下，`aplay -L` 必须能看到配置的 `AUDIO_ALSA_PCM`，默认是 `plughw:CARD=Headphones,DEV=0`。
 - 接听方能听到树莓派播放的测试音或 MP3，才说明上行注入真正成功。
 
 更完整的树莓派蓝牙配置和排障见 [docs/raspberry-pi-bluetooth-headset-runbook.md](/Users/liuzhuo/code/AutoCallBot/docs/raspberry-pi-bluetooth-headset-runbook.md)。

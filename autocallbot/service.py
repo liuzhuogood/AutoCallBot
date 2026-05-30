@@ -65,9 +65,9 @@ class CallService:
 
             connected_at = now_iso()
             await asyncio.sleep(config.POST_CONNECT_GRACE_SECONDS)
-            if config.REQUIRE_BT_SCO:
+            if config.REQUIRE_BT_SCO and audio.requires_android_bt_sco():
                 await self._wait_bt_sco()
-            await audio.ensure_bluealsa_sco()
+            await audio.ensure_audio_output()
 
             result = await self._play_until_done_or_hung_up(audio_path, play_seconds)
             if result == CallStatus.COMPLETED:
