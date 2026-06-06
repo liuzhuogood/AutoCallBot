@@ -7,7 +7,7 @@ from pathlib import Path
 # DEVICE_ID 仅用于日志和接口返回，方便区分当前外呼设备。
 DEVICE_ID = "phone-a"
 # ADB_SERIAL 是安卓手机的 ADB 设备号；网络 ADB 使用 ip:port，例如 10.0.0.117:5555。
-ADB_SERIAL = "10.0.0.117:5555"
+ADB_SERIAL = "10.0.0.114:5555"
 # 默认 SIM 卡槽；请求里不传 sim 时使用该值。
 DEFAULT_SIM = 0
 
@@ -22,7 +22,7 @@ NO_ANSWER_TIMEOUT_SECONDS = 20.0
 # 3.5mm 模式不依赖蓝牙路由，可设为 0；切回蓝牙模式时建议保留 1 秒左右，给 bt_sco 通话路由稳定时间。
 POST_CONNECT_GRACE_SECONDS = 0.0
 # 单次通话允许播放的最长秒数；请求里的 play_seconds 不会超过该上限。
-MAX_PLAY_SECONDS = 300.0
+MAX_PLAY_SECONDS = 30.0
 # 拨号前设置安卓手机媒体音量；设为 None 表示不主动调整。
 MEDIA_VOLUME: int | None = 15
 # 蓝牙模式下是否要求 Android 通话路由必须是 bt_sco。
@@ -34,7 +34,7 @@ BT_SCO_WAIT_SECONDS = 8.0
 # "bluetooth" 表示走 BlueALSA SCO/HFP；"alsa" 表示走本机 ALSA 设备，例如 3.5mm 耳机口。
 AUDIO_OUTPUT_BACKEND = "alsa"
 # ffmpeg 播放增益；3.5mm 或蓝牙音量偏小时可以调大。
-PLAYBACK_VOLUME = 4.0
+PLAYBACK_VOLUME = 1.0
 # 音频文件短于 play_seconds 时是否循环播放，开启后会循环播满请求时长。
 PLAYBACK_LOOP_FOREVER = True
 # ffmpeg 命令路径；部署环境不在 PATH 中时可改成绝对路径。
@@ -52,9 +52,9 @@ BLUEALSA_APLAY_PATH = "bluealsa-aplay"
 
 # 本机 3.5mm / ALSA 播放配置。
 # Raspberry Pi OS 通常会暴露 Headphones 这张 ALSA 卡；如设备名不同，改这里即可。
-AUDIO_ALSA_PCM = "plughw:CARD=Headphones,DEV=0"
+AUDIO_ALSA_PCM = "default"
 # 3.5mm 输出的采样率；保持 16k 便于和通话音频链路一致。
-ALSA_RATE = 16000
+ALSA_RATE = 48000
 # aplay 用于检查本机 ALSA 播放设备。
 APLAY_PATH = "aplay"
 

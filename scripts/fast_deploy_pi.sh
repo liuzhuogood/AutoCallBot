@@ -2,7 +2,7 @@
 set -euo pipefail
 
 APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-PI_HOST="${PI_HOST:-10.0.0.113}"
+PI_HOST="${PI_HOST:-10.0.0.6}"
 PI_USER="${PI_USER:-liuzhuo}"
 REMOTE_APP_DIR="${REMOTE_APP_DIR:-/home/${PI_USER}/AutoCallBot}"
 SERVICE_NAME="${SERVICE_NAME:-autocallbot}"

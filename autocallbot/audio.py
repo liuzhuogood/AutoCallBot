@@ -47,63 +47,77 @@ async def play_mp3(audio_path: str, seconds: float) -> None:
         raise AudioError(f"Audio file not found: {audio_path}")
 
     backend = get_audio_output_backend()
-    command = build_ffmpeg_command(path, seconds, backend)
-    logger.info("playback start backend={} audio_path={} seconds={}", backend, audio_path, seconds)
-    process = await asyncio.create_subprocess_exec(
-        *command,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
-    try:
-        stdout, stderr = await process.communicate()
-    except asyncio.CancelledError:
-        process.terminate()
-        try:
-            await asyncio.wait_for(process.communicate(), timeout=3)
-        except asyncio.TimeoutError:
-            process.kill()
-            await process.communicate()
-        logger.info("playback cancelled audio_path={}", audio_path)
-        raise
+    rate = audio_rate(backend)
 
-    stderr_text = stderr.decode(errors="replace").strip()
-    stdout_text = stdout.decode(errors="replace").strip()
-    if stdout_text:
-        logger.debug("ffmpeg stdout: {}", stdout_text)
-    if stderr_text:
-        logger.info("ffmpeg stderr: {}", stderr_text[-2000:])
-    if process.returncode != 0:
-        raise AudioError(f"ffmpeg playback failed with code {process.returncode}")
+    ffmpeg_cmd = _build_ffmpeg_cmd(path, seconds, rate, backend)
+    aplay_cmd = _build_aplay_cmd(rate, backend)
+
+    logger.info("playback start backend={} audio_path={} seconds={}", backend, audio_path, seconds)
+    await asyncio.to_thread(_play_pipe, ffmpeg_cmd, aplay_cmd)
     logger.info("playback finished audio_path={}", audio_path)
 
 
-def build_ffmpeg_command(path: Path, seconds: float, backend: AudioOutputBackend) -> list[str]:
-    command = [
-        config.FFMPEG_PATH,
-        "-hide_banner",
-        "-nostdin",
-        "-re",
-    ]
+def _build_ffmpeg_cmd(path: Path, seconds: float, rate: int, backend: AudioOutputBackend) -> list[str]:
+    cmd = [config.FFMPEG_PATH, "-hide_banner", "-nostdin"]
     if config.PLAYBACK_LOOP_FOREVER:
-        command.extend(["-stream_loop", "-1"])
-    command.extend(
-        [
-            "-i",
-            str(path),
-            "-t",
-            str(seconds),
-            "-af",
-            f"volume={config.PLAYBACK_VOLUME},aresample={audio_rate(backend)}",
-            "-f",
-            "alsa",
-            "-ac",
-            "1",
-            "-ar",
-            str(audio_rate(backend)),
-            audio_pcm(backend),
-        ]
+        cmd.extend(["-stream_loop", "-1"])
+    cmd.extend([
+        "-i", str(path),
+        "-t", str(seconds),
+        "-af", f"volume={config.PLAYBACK_VOLUME},aresample={rate}",
+        "-f", "s16le",
+        "-ac", "2",
+        "-ar", str(rate),
+        "-",
+    ])
+    return cmd
+
+
+def _build_aplay_cmd(rate: int, backend: AudioOutputBackend) -> list[str]:
+    return [
+        config.APLAY_PATH,
+        "-D", audio_pcm(backend),
+        "-f", "S16_LE",
+        "-r", str(rate),
+        "-c", "2",
+    ]
+
+
+def _play_pipe(ffmpeg_cmd: list[str], aplay_cmd: list[str]) -> None:
+    ffmpeg_proc = subprocess.Popen(
+        ffmpeg_cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
     )
-    return command
+    aplay_proc = subprocess.Popen(
+        aplay_cmd,
+        stdin=ffmpeg_proc.stdout,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    ffmpeg_proc.stdout.close()
+
+    try:
+        aplay_proc.wait()
+    except KeyboardInterrupt:
+        aplay_proc.terminate()
+        ffmpeg_proc.terminate()
+        aplay_proc.wait(timeout=3)
+        ffmpeg_proc.wait(timeout=3)
+        raise
+
+    ffmpeg_proc.wait()
+
+    ffmpeg_stderr = ffmpeg_proc.stderr.read().decode(errors="replace").strip()
+    aplay_stderr = aplay_proc.stderr.read().decode(errors="replace").strip()
+    if ffmpeg_stderr:
+        logger.info("ffmpeg stderr: {}", ffmpeg_stderr[-2000:])
+    if aplay_stderr:
+        logger.info("aplay stderr: {}", aplay_stderr[-2000:])
+    if ffmpeg_proc.returncode and ffmpeg_proc.returncode != 0:
+        raise AudioError(f"ffmpeg failed with code {ffmpeg_proc.returncode}")
+    if aplay_proc.returncode and aplay_proc.returncode != 0:
+        raise AudioError(f"aplay failed with code {aplay_proc.returncode}")
 
 
 def get_audio_output_backend() -> AudioOutputBackend:

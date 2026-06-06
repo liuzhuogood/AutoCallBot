@@ -47,7 +47,6 @@ source .venv/bin/activate
 pip install -e .
 uvicorn autocallbot.main:app --host 0.0.0.0 --port 10086
 ```
-
 树莓派部署：
 
 ```bash
