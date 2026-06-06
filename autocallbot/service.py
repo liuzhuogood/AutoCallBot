@@ -9,7 +9,7 @@ from loguru import logger
 
 from autocallbot import audio, config
 from autocallbot.adb import AdbClient, AdbError, CallState
-from autocallbot.models import CallResponse, CallStatus
+from autocallbot.models import CallResponse, CallStatus, SmsResponse, SmsStatus
 
 
 def now_iso() -> str:
@@ -27,6 +27,14 @@ class CallService:
             return None
         try:
             return await self._call(phone, audio_path, config.DEFAULT_SIM if sim is None else sim, self._seconds(play_seconds))
+        finally:
+            await self._release()
+
+    async def send_sms(self, phone: str, content: str, sim: int | None) -> SmsResponse | None:
+        if not await self._acquire():
+            return None
+        try:
+            return await self._send_sms(phone, content, config.DEFAULT_SIM if sim is None else sim)
         finally:
             await self._release()
 
@@ -79,6 +87,43 @@ class CallService:
             logger.exception("call failed call_id={} phone={}", call_id, phone)
             await self._safe_hangup()
             return response(CallStatus.FAILED, "call failed", str(exc))
+
+    async def _send_sms(self, phone: str, content: str, sim: int) -> SmsResponse:
+        sms_id = str(uuid.uuid4())
+        started_at = now_iso()
+        logger.info("sms start sms_id={} phone={} content_length={} sim={}", sms_id, phone, len(content), sim)
+
+        def response(status: SmsStatus, message: str, error: str | None = None) -> SmsResponse:
+            return SmsResponse(
+                status=status,
+                message=message,
+                sms_id=sms_id,
+                phone=phone,
+                device_id=config.DEVICE_ID,
+                started_at=started_at,
+                ended_at=now_iso(),
+                error=error,
+            )
+
+        try:
+            await self.adb.send_sms(
+                phone=phone,
+                content=content,
+                sim=sim,
+                wake_screen_before_send=config.SMS_WAKE_SCREEN_BEFORE_SEND,
+                compose_wait_seconds=config.SMS_COMPOSE_WAIT_SECONDS,
+                send_button_resource_id=config.SMS_SEND_BUTTON_RESOURCE_ID,
+                confirm_keyevents=config.SMS_CONFIRM_KEYEVENTS,
+                confirm_taps=config.SMS_CONFIRM_TAPS,
+                keyevent_interval_seconds=config.SMS_KEYEVENT_INTERVAL_SECONDS,
+                timeout=config.SMS_SEND_TIMEOUT_SECONDS,
+            )
+            final = response(SmsStatus.SENT, "sms send command completed")
+            logger.info("sms end sms_id={} status={} message={}", sms_id, final.status, final.message)
+            return final
+        except Exception as exc:
+            logger.exception("sms failed sms_id={} phone={}", sms_id, phone)
+            return response(SmsStatus.FAILED, "sms failed", str(exc))
 
     async def _play_until_done_or_hung_up(self, audio_path: str, play_seconds: float) -> CallStatus:
         playback = asyncio.create_task(audio.play_mp3(audio_path, play_seconds))

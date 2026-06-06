@@ -23,35 +23,41 @@ def test_get_audio_output_backend_rejects_unknown_value(monkeypatch: pytest.Monk
         audio.get_audio_output_backend()
 
 
-def test_build_ffmpeg_command_uses_bluetooth_pcm(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_build_audio_pipe_command_uses_bluetooth_pcm(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(config, "BLUEALSA_PCM", "bluealsa:DEV=AA:BB,PROFILE=sco")
     monkeypatch.setattr(config, "SCO_RATE", 16000)
     monkeypatch.setattr(config, "PLAYBACK_LOOP_FOREVER", True)
 
-    command = audio.build_ffmpeg_command(Path("audio/kgtx.mp3"), 30, "bluetooth")
+    ffmpeg_command = audio._build_ffmpeg_cmd(Path("audio/kgtx.mp3"), 30, 16000, "bluetooth")
+    aplay_command = audio._build_aplay_cmd(16000, "bluetooth")
 
-    assert command[command.index("-stream_loop") + 1] == "-1"
-    assert command[-1] == "bluealsa:DEV=AA:BB,PROFILE=sco"
-    assert command[command.index("-ar") + 1] == "16000"
-    assert command[command.index("-af") + 1] == "volume=4.0,aresample=16000"
+    assert ffmpeg_command[ffmpeg_command.index("-stream_loop") + 1] == "-1"
+    assert ffmpeg_command[-1] == "-"
+    assert ffmpeg_command[ffmpeg_command.index("-ar") + 1] == "16000"
+    assert ffmpeg_command[ffmpeg_command.index("-af") + 1] == "volume=1.0,aresample=16000"
+    assert aplay_command[aplay_command.index("-D") + 1] == "bluealsa:DEV=AA:BB,PROFILE=sco"
+    assert aplay_command[aplay_command.index("-r") + 1] == "16000"
 
 
-def test_build_ffmpeg_command_uses_local_alsa_pcm(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_build_audio_pipe_command_uses_local_alsa_pcm(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(config, "AUDIO_ALSA_PCM", "plughw:CARD=Headphones,DEV=0")
     monkeypatch.setattr(config, "ALSA_RATE", 48000)
     monkeypatch.setattr(config, "PLAYBACK_LOOP_FOREVER", True)
 
-    command = audio.build_ffmpeg_command(Path("audio/kgtx.mp3"), 30, "alsa")
+    ffmpeg_command = audio._build_ffmpeg_cmd(Path("audio/kgtx.mp3"), 30, 48000, "alsa")
+    aplay_command = audio._build_aplay_cmd(48000, "alsa")
 
-    assert command[command.index("-stream_loop") + 1] == "-1"
-    assert command[-1] == "plughw:CARD=Headphones,DEV=0"
-    assert command[command.index("-ar") + 1] == "48000"
-    assert command[command.index("-af") + 1] == "volume=4.0,aresample=48000"
+    assert ffmpeg_command[ffmpeg_command.index("-stream_loop") + 1] == "-1"
+    assert ffmpeg_command[-1] == "-"
+    assert ffmpeg_command[ffmpeg_command.index("-ar") + 1] == "48000"
+    assert ffmpeg_command[ffmpeg_command.index("-af") + 1] == "volume=1.0,aresample=48000"
+    assert aplay_command[aplay_command.index("-D") + 1] == "plughw:CARD=Headphones,DEV=0"
+    assert aplay_command[aplay_command.index("-r") + 1] == "48000"
 
 
-def test_build_ffmpeg_command_can_disable_looping(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_build_audio_pipe_command_can_disable_looping(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(config, "PLAYBACK_LOOP_FOREVER", False)
 
-    command = audio.build_ffmpeg_command(Path("audio/kgtx.mp3"), 30, "alsa")
+    command = audio._build_ffmpeg_cmd(Path("audio/kgtx.mp3"), 30, 48000, "alsa")
 
     assert "-stream_loop" not in command

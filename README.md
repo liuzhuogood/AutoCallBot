@@ -7,6 +7,9 @@ AutoCallBot 是一个部署在树莓派上的单通道安卓自动外呼服务�
 ```mermaid
 flowchart LR
     A["POST /call"] --> B["ADB 拨号"]
+    A2["POST /sms"] --> B2["ADB 打开短信发送界面"]
+    B2 --> C2["写入手机号和内容"]
+    C2 --> D2["定位发送按钮并确认发送"]
     B --> C["等待电话接通"]
     C --> D{"AUDIO_OUTPUT_BACKEND"}
     D -->|bluetooth| E["确认 Android 通话路由是 bt_sco"]
@@ -16,7 +19,8 @@ flowchart LR
     G --> H
 ```
 
-只做 `手机A -> 树莓派A`，不做多手机池、不做任务状态库、不做外部 JSON 配置。
+只做 `手机A -> 树莓派A`，不做多手机池、不做任务状态库、不做外部 JSON 配置。`/call` 和 `/sms`
+共享同一台手机的单通道占用保护。
 
 ## 配置
 
@@ -82,6 +86,17 @@ curl -X POST http://127.0.0.1:10086/call \
 ```
 
 接口会等待本次外呼结束后返回最终结果。当前手机占用时返回 `409 busy`。
+
+营销短信网关调用：
+
+```bash
+curl -X POST http://127.0.0.1:10086/sms \
+  -H 'Content-Type: application/json' \
+  -d '{"phone":"13800138000","content":"这是一条测试短信"}'
+```
+
+`/sms` 与后台管理系统“营销短信”的自建网关契约一致，请求体为 `phone/content`。发送按钮确认成功返回
+HTTP 2xx；ADB 或短信 App 自动确认失败时返回非 2xx，后台会把该记录记为失败并保存网关响应。
 
 日志写入：
 

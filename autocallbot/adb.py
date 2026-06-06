@@ -5,6 +5,7 @@ import re
 import subprocess
 from dataclasses import dataclass
 from enum import IntEnum
+from xml.etree import ElementTree
 
 
 class CallState(IntEnum):
@@ -65,6 +66,53 @@ class AdbClient:
             ]
         )
 
+    async def send_sms(
+        self,
+        phone: str,
+        content: str,
+        sim: int,
+        wake_screen_before_send: bool,
+        compose_wait_seconds: float,
+        send_button_resource_id: str | None,
+        confirm_keyevents: list[str],
+        confirm_taps: list[tuple[int, int]],
+        keyevent_interval_seconds: float,
+        timeout: float,
+    ) -> str:
+        if wake_screen_before_send:
+            await self.wake_screen(timeout=timeout)
+        output = await self.shell(build_sms_intent_args(phone, content, sim), timeout=timeout)
+        await asyncio.sleep(compose_wait_seconds)
+        confirmed = False
+        if send_button_resource_id:
+            await self.tap_by_resource_id(send_button_resource_id, timeout=timeout)
+            confirmed = True
+        for keyevent in confirm_keyevents:
+            await self.shell(["shell", "input", "keyevent", keyevent], timeout=timeout)
+            confirmed = True
+            await asyncio.sleep(keyevent_interval_seconds)
+        for x, y in confirm_taps:
+            await self.shell(["shell", "input", "tap", str(x), str(y)], timeout=timeout)
+            confirmed = True
+            await asyncio.sleep(keyevent_interval_seconds)
+        if not confirmed:
+            raise AdbError("sms confirm action is not configured")
+        return output
+
+    async def wake_screen(self, timeout: float = 10.0) -> None:
+        await self.shell(["shell", "input", "keyevent", "WAKEUP"], timeout=timeout)
+        await self.shell(["shell", "wm", "dismiss-keyguard"], timeout=timeout)
+
+    async def tap_by_resource_id(self, resource_id: str, timeout: float = 10.0) -> None:
+        dump_path = "/sdcard/autocallbot-window.xml"
+        await self.shell(["shell", "uiautomator", "dump", dump_path], timeout=timeout)
+        output = await self.shell(["shell", "cat", dump_path], timeout=timeout)
+        bounds = find_resource_bounds(output, resource_id)
+        if bounds is None:
+            raise AdbError(f"resource id not found: {resource_id}")
+        left, top, right, bottom = bounds
+        await self.shell(["shell", "input", "tap", str((left + right) // 2), str((top + bottom) // 2)], timeout=timeout)
+
     async def hangup(self) -> None:
         await self.shell(["shell", "input", "keyevent", "KEYCODE_ENDCALL"], timeout=10)
 
@@ -107,6 +155,51 @@ def is_connect_success(output: str) -> bool:
 def is_missing_device_error(message: str) -> bool:
     normalized = message.lower()
     return "not found" in normalized or "offline" in normalized or "no devices" in normalized
+
+
+def build_sms_intent_args(phone: str, content: str, sim: int) -> list[str]:
+    return [
+        "shell",
+        "am",
+        "start",
+        "-a",
+        "android.intent.action.SENDTO",
+        "-d",
+        f"smsto:{phone}",
+        "--es",
+        "sms_body",
+        content,
+        "--ez",
+        "exit_on_sent",
+        "true",
+        "--ei",
+        "com.android.phone.extra.slot",
+        str(sim),
+        "--ei",
+        "android.telephony.extra.SUBSCRIPTION_INDEX",
+        str(sim),
+    ]
+
+
+def find_resource_bounds(xml_text: str, resource_id: str) -> tuple[int, int, int, int] | None:
+    try:
+        root = ElementTree.fromstring(xml_text)
+    except ElementTree.ParseError:
+        return None
+    for node in root.iter("node"):
+        if node.attrib.get("resource-id") != resource_id:
+            continue
+        bounds = parse_bounds(node.attrib.get("bounds", ""))
+        if bounds is not None:
+            return bounds
+    return None
+
+
+def parse_bounds(bounds: str) -> tuple[int, int, int, int] | None:
+    match = re.fullmatch(r"\[(\d+),(\d+)]\[(\d+),(\d+)]", bounds)
+    if match is None:
+        return None
+    return tuple(int(value) for value in match.groups())
 
 
 def parse_call_state(output: str) -> CallState:

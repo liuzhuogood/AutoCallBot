@@ -11,6 +11,22 @@ ADB_SERIAL = "10.0.0.114:5555"
 # 默认 SIM 卡槽；请求里不传 sim 时使用该值。
 DEFAULT_SIM = 0
 
+# 短信发送配置。
+# 通过 Android 短信 Intent 写入手机号和内容，再用按键事件确认发送。
+SMS_COMPOSE_WAIT_SECONDS = 1.0
+# 发送前唤醒屏幕，避免短信 App 打开后被锁屏或通知面板遮挡。
+SMS_WAKE_SCREEN_BEFORE_SEND = True
+# 默认短信 App 发送按钮资源 ID；优先动态读取按钮坐标，避免键盘弹出后固定坐标失效。
+SMS_SEND_BUTTON_RESOURCE_ID = "com.android.mms:id/send_button"
+# 可选按键确认；当前 vivo 短信 App 用按键会误触添加联系人，默认只用坐标点击。
+SMS_CONFIRM_KEYEVENTS = []
+# 可选兜底点击坐标，格式为 [(x, y)]；默认依赖 SMS_SEND_BUTTON_RESOURCE_ID 动态定位。
+SMS_CONFIRM_TAPS = []
+# 多个确认按键之间的间隔。
+SMS_KEYEVENT_INTERVAL_SECONDS = 0.2
+# 单次短信 ADB 操作超时时间。
+SMS_SEND_TIMEOUT_SECONDS = 20.0
+
 # 外呼流程控制参数。
 # 轮询手机通话状态的间隔，越小越灵敏，但 ADB 调用越频繁；3.5mm 模式下可适当调低减少接通后空白。
 POLL_INTERVAL_SECONDS = 0.3
